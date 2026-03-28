@@ -1,11 +1,10 @@
+import json
+import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiogram import Bot
 from config import GROUP_CHAT_ID, DAILY_POLL_HOUR, DAILY_POLL_MINUTE
 
-
-# ──────────────────────────────────────────
-#  Щоденне автоматичне опитування о 13:00
-# ──────────────────────────────────────────
+POLL_TIME_FILE = "data/poll_time.json"
 
 DAILY_POLL_QUESTION = "🎮 Як пройшов ваш Brawl Stars сьогодні?"
 DAILY_POLL_OPTIONS = [
@@ -16,9 +15,24 @@ DAILY_POLL_OPTIONS = [
     "😴 Ще не грав(а)",
 ]
 
+_scheduler: AsyncIOScheduler = None
+
+
+def load_poll_time() -> tuple:
+    if not os.path.exists(POLL_TIME_FILE):
+        return DAILY_POLL_HOUR, DAILY_POLL_MINUTE
+    with open(POLL_TIME_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("hour", DAILY_POLL_HOUR), data.get("minute", DAILY_POLL_MINUTE)
+
+
+def save_poll_time(hour: int, minute: int):
+    os.makedirs(os.path.dirname(POLL_TIME_FILE), exist_ok=True)
+    with open(POLL_TIME_FILE, "w", encoding="utf-8") as f:
+        json.dump({"hour": hour, "minute": minute}, f)
+
 
 async def send_daily_poll(bot: Bot):
-    """Надіслати щоденне опитування у групу."""
     try:
         await bot.send_message(
             chat_id=GROUP_CHAT_ID,
@@ -37,15 +51,33 @@ async def send_daily_poll(bot: Bot):
 
 
 def schedule_daily_poll(scheduler: AsyncIOScheduler, bot: Bot):
-    """Зареєструвати щоденне опитування у планувальнику."""
+    global _scheduler
+    _scheduler = scheduler
+    hour, minute = load_poll_time()
     scheduler.add_job(
         send_daily_poll,
         trigger="cron",
-        hour=DAILY_POLL_HOUR,
-        minute=DAILY_POLL_MINUTE,
+        hour=hour,
+        minute=minute,
         timezone="Europe/Kiev",
         args=[bot],
         id="daily_poll",
         replace_existing=True,
     )
-    print(f"[SCHEDULER] Щоденне опитування о {DAILY_POLL_HOUR:02d}:{DAILY_POLL_MINUTE:02d} (Київ) зареєстровано.")
+    print(f"[SCHEDULER] Щоденне опитування о {hour:02d}:{minute:02d} (Київ) зареєстровано.")
+
+
+def update_poll_time(bot: Bot, hour: int, minute: int) -> bool:
+    global _scheduler
+    if _scheduler is None:
+        return False
+    save_poll_time(hour, minute)
+    _scheduler.reschedule_job(
+        "daily_poll",
+        trigger="cron",
+        hour=hour,
+        minute=minute,
+        timezone="Europe/Kiev",
+    )
+    print(f"[SCHEDULER] Час опитування змінено на {hour:02d}:{minute:02d} (Київ)")
+    return True
