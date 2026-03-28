@@ -1,12 +1,19 @@
 import json
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from config import ADMIN_IDS, GROUP_CHAT_ID
 
 router = Router()
+
+KYIV_TZ = ZoneInfo("Europe/Kiev")
+
+
+def kyiv_now() -> str:
+    return datetime.now(KYIV_TZ).strftime("%d.%m.%Y %H:%M")
 
 MEGA_FILE = "data/megakopilka.json"
 
@@ -56,7 +63,7 @@ async def cmd_mega_start(message: Message):
         )
         return
 
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now = kyiv_now()
     data["active"] = True
     data["start_date"] = now
     data["title"] = title
@@ -100,7 +107,7 @@ async def mega_join_callback(callback: CallbackQuery):
     data["participants"].append(user.id)
     data["participant_names"].append(f"{full_name}{username_part}")
     save_mega(data)
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now = kyiv_now()
 
     mega_title = data.get("title", "Мегакопілка")
 
@@ -139,7 +146,7 @@ async def cmd_mega_end(message: Message):
         await message.reply("❌ Зараз немає активної мегакопілки.")
         return
 
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now = kyiv_now()
     title = data["title"]
     data["active"] = False
 
