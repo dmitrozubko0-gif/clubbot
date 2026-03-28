@@ -17,12 +17,12 @@ MEGA_FILE = "data/megakopilka.json"
 
 def load_mega() -> dict:
     if not os.path.exists(MEGA_FILE):
-        return {"active": False, "start_date": None, "title": "", "session_id": 0, "participants": [], "history": []}
+        return {"active": False, "start_date": None, "title": "", "session_id": 0, "participants": [], "participant_names": [], "history": []}
     with open(MEGA_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # сумісність зі старими файлами
     data.setdefault("session_id", 0)
     data.setdefault("participants", [])
+    data.setdefault("participant_names", [])
     return data
 
 
@@ -62,11 +62,12 @@ async def cmd_mega_start(message: Message):
     data["title"] = title
     data["session_id"] = data.get("session_id", 0) + 1
     data["participants"] = []
+    data["participant_names"] = []
     data["history"].append({"title": title, "started": now, "ended": None})
     save_mega(data)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🏆 Я берю участь!", callback_data="mega_join")
+        InlineKeyboardButton(text="🏆 Я беру участь!", callback_data="mega_join")
     ]])
 
     await message.answer(
@@ -94,13 +95,13 @@ async def mega_join_callback(callback: CallbackQuery):
         return
 
     # Додаємо учасника
-    data["participants"].append(user.id)
-    save_mega(data)
-
-    # Формуємо ім'я користувача
     full_name = user.full_name or user.first_name
     username_part = f" (@{user.username})" if user.username else ""
+    data["participants"].append(user.id)
+    data["participant_names"].append(f"{full_name}{username_part}")
+    save_mega(data)
     now = datetime.now().strftime("%d.%m.%Y %H:%M")
+
     mega_title = data.get("title", "Мегакопілка")
 
     # Повідомлення для адмінів
@@ -163,13 +164,26 @@ async def cmd_mega_status(message: Message):
     data = load_mega()
 
     if data.get("active"):
-        await message.reply(
+        names = data.get("participant_names", [])
+        count = len(names)
+
+        text = (
             f"🔥 <b>МЕГАКОПІЛКА АКТИВНА!</b>\n\n"
             f"🎮 Назва: <b>{data['title']}</b>\n"
             f"📅 Початок: {data['start_date']}\n\n"
-            f"Продовжуємо фармити! 💰",
-            parse_mode="HTML"
         )
+
+        if count == 0:
+            text += "👥 Учасників поки немає — будь першим!\n\n"
+        else:
+            text += f"👥 <b>Учасники ({count}):</b>\n"
+            for i, name in enumerate(names, 1):
+                text += f"  {i}. {name}\n"
+            text += "\n"
+
+        text += "Продовжуємо фармити! 💰"
+
+        await message.reply(text, parse_mode="HTML")
     else:
         history = data.get("history", [])
         last = history[-1] if history else None
