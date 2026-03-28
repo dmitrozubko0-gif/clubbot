@@ -43,8 +43,9 @@ def schedule_daily_poll(scheduler: AsyncIOScheduler, bot: Bot):
         trigger="cron",
         hour=DAILY_POLL_HOUR,
         minute=DAILY_POLL_MINUTE,
+        timezone="Europe/Kiev",
         args=[bot],
         id="daily_poll",
         replace_existing=True,
     )
-    print(f"[SCHEDULER] Щоденне опитування о {DAILY_POLL_HOUR:02d}:{DAILY_POLL_MINUTE:02d} зареєстровано.")
+    print(f"[SCHEDULER] Щоденне опитування о {DAILY_POLL_HOUR:02d}:{DAILY_POLL_MINUTE:02d} (Київ) зареєстровано.")
