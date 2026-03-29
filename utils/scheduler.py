@@ -10,7 +10,7 @@ DAILY_POLL_QUESTION = "🎮 Чи апнули ви вже за сьогодні 
 DAILY_POLL_OPTIONS = [
     "🔥 Так,апнув/апнула",
     "😎 В процесі",
-    "😐 Покіщо не починав/починала",
+    "😐 Поки що не починав/починала",
 ]
 
 _scheduler: AsyncIOScheduler = None
