@@ -5,7 +5,8 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from config import ADMIN_IDS
+from config import ADMIN_IDS, GROUP_CHAT_ID
+from utils.publish import publish_keyboard
 
 router = Router()
 
@@ -36,6 +37,21 @@ def save_events(events: list):
     os.makedirs(os.path.dirname(EVENTS_FILE), exist_ok=True)
     with open(EVENTS_FILE, "w", encoding="utf-8") as f:
         json.dump(events, f, ensure_ascii=False, indent=2)
+
+
+def events_text() -> str:
+    events = load_events()
+    if not events:
+        return "📅 <b>Розклад подій Brawl Stars</b>\n\nПодій поки немає."
+    text = "📅 <b>Розклад подій Brawl Stars</b>\n\n"
+    for event in events:
+        type_label = EVENT_TYPES.get(event.get("type", "other"), "📌")
+        text += f"{type_label} <b>{event['title']}</b>\n"
+        text += f"   📆 {event['date']}\n"
+        if event.get("description"):
+            text += f"   💬 {event['description']}\n"
+        text += "\n"
+    return text
 
 
 # ──────────────────────────────────────────
@@ -121,36 +137,34 @@ async def event_description(message: Message, state: FSMContext):
 
     type_label = EVENT_TYPES.get(data["type"], "📌")
     await message.reply(
-        f"✅ Подію додано!\n\n"
+        f"✅ Подію збережено!\n\n"
         f"{type_label} <b>{data['title']}</b>\n"
-        f"📅 {data['date']}",
-        parse_mode="HTML"
+        f"📅 {data['date']}\n\nОпублікувати розклад подій у групу?",
+        parse_mode="HTML",
+        reply_markup=publish_keyboard("events")
     )
 
 
 @router.message(Command("events"))
 async def cmd_events(message: Message):
-    """Показати розклад подій Brawl Stars."""
-    events = load_events()
+    await message.reply(events_text(), parse_mode="HTML")
 
-    if not events:
-        await message.reply(
-            "📅 <b>Розклад подій</b>\n\nПодій поки немає.\n"
-            "Адмін може додати командою /addevent",
-            parse_mode="HTML"
-        )
-        return
 
-    text = "📅 <b>Розклад подій Brawl Stars</b>\n\n"
-    for event in events:
-        type_label = EVENT_TYPES.get(event.get("type", "other"), "📌")
-        text += f"{type_label} <b>{event['title']}</b>\n"
-        text += f"   📆 {event['date']}\n"
-        if event.get("description"):
-            text += f"   💬 {event['description']}\n"
-        text += "\n"
+@router.callback_query(F.data == "pub_yes_events")
+async def publish_events(callback: CallbackQuery):
+    await callback.bot.send_message(
+        chat_id=GROUP_CHAT_ID,
+        text=events_text(),
+        parse_mode="HTML"
+    )
+    await callback.message.edit_text("✅ Розклад опубліковано у групу!")
+    await callback.answer()
 
-    await message.reply(text, parse_mode="HTML")
+
+@router.callback_query(F.data == "pub_no_events")
+async def no_publish_events(callback: CallbackQuery):
+    await callback.message.edit_text("👌 Збережено, не опубліковано.")
+    await callback.answer()
 
 
 @router.message(Command("delevent"))
