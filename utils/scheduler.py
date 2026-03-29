@@ -6,13 +6,11 @@ from config import GROUP_CHAT_ID, DAILY_POLL_HOUR, DAILY_POLL_MINUTE
 
 POLL_TIME_FILE = "data/poll_time.json"
 
-DAILY_POLL_QUESTION = "🎮 Як пройшов ваш Brawl Stars сьогодні?"
+DAILY_POLL_QUESTION = "🎮 Чи апнули ви вже за сьогодні 200 кубків??"
 DAILY_POLL_OPTIONS = [
-    "🔥 Відмінно, багато перемог!",
-    "😎 Нормально, є прогрес",
-    "😐 Так собі, важкувато",
-    "💀 Жах, самі поразки",
-    "😴 Ще не грав(а)",
+    "🔥 Так,апнув/апнула",
+    "😎 В процесі",
+    "😐 Покіщо не починав/починала",
 ]
 
 _scheduler: AsyncIOScheduler = None
