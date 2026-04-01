@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -46,8 +46,6 @@ async def say_text_received(message: Message, state: FSMContext):
         parse_mode="HTML",
         reply_markup=confirm_keyboard("say")
     )
-    # Зберігаємо текст у наступному повідомленні через callback_data недостатньо —
-    # тому кешуємо у простому dict
     _pending_say[message.from_user.id] = message.text
 
 
@@ -80,12 +78,9 @@ async def cancel_say(callback: CallbackQuery):
 RICKROLL_TEXT = (
     "🎮 <b>УВАГА! ТЕРМІНОВЕ ПОВІДОМЛЕННЯ ДЛЯ КЛУБУ!</b>\n\n"
     "🏆 Розробники Brawl Stars щойно оголосили:\n\n"
-    "✅ Безкоштовний Brawl Pass для всіх гравців\n"
-    "✅ x10 до кубків на тиждень\n"
-    "✅ Всі скіни безкоштовно\n\n"
-    "👇 Деталі за посиланням — не пропусти!\n\n"
-    "🔗 https://youtu.be/dQw4w9WgXcQ\n\n"
-    "😂 <b>З 1 квітня, клуб! Попався!</b> 🎣"
+    "✅ Безкоштовний Chaos Drop\n"
+    "✅ x2 Star Drop\n"
+    "👇 Скануй QR-код щоб забрати бонуси! 👇"
 )
 
 
@@ -96,7 +91,7 @@ async def cmd_rickroll(message: Message):
         return
     await message.reply(
         "🎣 <b>Rick Roll для клубу</b>\n\n"
-        "Бот відправить «офіційне» повідомлення про безкоштовний Brawl Pass 😈\n\n"
+        "Бот відправить повідомлення з QR-кодом на «бонуси» 😈\n\n"
         "Відправити у групу?",
         parse_mode="HTML",
         reply_markup=confirm_keyboard("rickroll")
@@ -105,12 +100,19 @@ async def cmd_rickroll(message: Message):
 
 @router.callback_query(F.data == "send_yes_rickroll")
 async def confirm_rickroll(callback: CallbackQuery):
-    await callback.bot.send_message(
-        chat_id=GROUP_CHAT_ID,
-        text=RICKROLL_TEXT,
-        parse_mode="HTML"
-    )
-    await callback.message.edit_text("😂 Rick Roll відправлено! З 1 квітня! 🎣")
+    try:
+        # Відправляємо файл qr_code.png як фото з підписом
+        photo = FSInputFile("qr_code.png")
+        await callback.bot.send_photo(
+            chat_id=GROUP_CHAT_ID,
+            photo=photo,
+            caption=RICKROLL_TEXT,
+            parse_mode="HTML"
+        )
+        await callback.message.edit_text("😂 Rick Roll з QR-кодом відправлено! 🎣")
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Помилка: Переконайтеся, що файл qr_code.png лежить у папці з ботом.\n\nДеталі: {e}")
+    
     await callback.answer()
 
 
