@@ -5,7 +5,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import BOT_TOKEN
-from handlers import polls, goals, megakopilka, admin, top, cups, events
+from handlers import polls, goals, megakopilka, admin, top, cups, events, broadcast
 from utils.scheduler import schedule_daily_poll
 
 logging.basicConfig(
@@ -27,6 +27,7 @@ async def main():
     dp.include_router(top.router)
     dp.include_router(cups.router)
     dp.include_router(events.router)
+    dp.include_router(broadcast.router)
     dp.include_router(admin.router)
 
     # Планувальник щоденного опитування о 13:00
