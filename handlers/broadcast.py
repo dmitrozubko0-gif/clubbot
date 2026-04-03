@@ -7,6 +7,9 @@ from config import ADMIN_IDS, GROUP_CHAT_ID
 
 router = Router()
 
+# Тимчасове сховище між FSM і callback
+_pending_say: dict = {}
+
 
 def confirm_keyboard(action: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -16,11 +19,11 @@ def confirm_keyboard(action: str) -> InlineKeyboardMarkup:
 
 
 # ──────────────────────────────────────────
-#  /say — надіслати повідомлення від бота
+#  /say — текст або фото у групу
 # ──────────────────────────────────────────
 
 class SayStates(StatesGroup):
-    waiting_for_text = State()
+    waiting_for_content = State()
 
 
 @router.message(Command("say"))
@@ -30,37 +33,71 @@ async def cmd_say(message: Message, state: FSMContext):
         return
     await message.reply(
         "✍️ <b>Повідомлення у групу</b>\n\n"
-        "Введіть текст який бот відправить у групу:",
+        "Надішліть текст <b>або картинку</b> (можна з підписом) — бот відправить це у групу:",
         parse_mode="HTML"
     )
-    await state.set_state(SayStates.waiting_for_text)
+    await state.set_state(SayStates.waiting_for_content)
 
 
-@router.message(SayStates.waiting_for_text)
-async def say_text_received(message: Message, state: FSMContext):
-    await state.update_data(text=message.text)
+@router.message(SayStates.waiting_for_content, F.photo)
+async def say_photo_received(message: Message, state: FSMContext):
+    """Отримали фото."""
     await state.clear()
+
+    caption = message.caption or ""
+    photo_id = message.photo[-1].file_id  # найбільша якість
+
+    _pending_say[message.from_user.id] = {
+        "type": "photo",
+        "photo_id": photo_id,
+        "caption": caption,
+    }
+
+    preview_caption = f"\n📝 Підпис: <i>{caption}</i>" if caption else "\n📝 Підпис: <i>немає</i>"
+    await message.reply(
+        f"🖼 <b>Попередній перегляд:</b>{preview_caption}\n\n―――――――――\nВідправити фото у групу?",
+        parse_mode="HTML",
+        reply_markup=confirm_keyboard("say")
+    )
+
+
+@router.message(SayStates.waiting_for_content, F.text)
+async def say_text_received(message: Message, state: FSMContext):
+    """Отримали текст."""
+    await state.clear()
+
+    _pending_say[message.from_user.id] = {
+        "type": "text",
+        "text": message.text,
+    }
 
     await message.reply(
         f"📋 <b>Попередній перегляд:</b>\n\n{message.text}\n\n―――――――――\nВідправити у групу?",
         parse_mode="HTML",
         reply_markup=confirm_keyboard("say")
     )
-    _pending_say[message.from_user.id] = message.text
-
-
-# Тимчасове сховище тексту між FSM і callback
-_pending_say: dict = {}
 
 
 @router.callback_query(F.data == "send_yes_say")
 async def confirm_say(callback: CallbackQuery):
-    text = _pending_say.pop(callback.from_user.id, None)
-    if not text:
-        await callback.answer("❌ Текст не знайдено, спробуй ще раз.", show_alert=True)
+    data = _pending_say.pop(callback.from_user.id, None)
+    if not data:
+        await callback.answer("❌ Дані не знайдено, спробуй ще раз.", show_alert=True)
         return
-    await callback.bot.send_message(chat_id=GROUP_CHAT_ID, text=text)
-    await callback.message.edit_text("✅ Повідомлення відправлено у групу!")
+
+    if data["type"] == "photo":
+        await callback.bot.send_photo(
+            chat_id=GROUP_CHAT_ID,
+            photo=data["photo_id"],
+            caption=data["caption"] or None,
+        )
+    else:
+        await callback.bot.send_message(
+            chat_id=GROUP_CHAT_ID,
+            text=data["text"],
+        )
+
+    await callback.message.edit_text("✅ Відправлено у групу!")
     await callback.answer()
 
 
@@ -101,7 +138,6 @@ async def cmd_rickroll(message: Message):
 @router.callback_query(F.data == "send_yes_rickroll")
 async def confirm_rickroll(callback: CallbackQuery):
     try:
-        # Відправляємо файл qr_code.png як фото з підписом
         photo = FSInputFile("qr_code.png")
         await callback.bot.send_photo(
             chat_id=GROUP_CHAT_ID,
@@ -111,8 +147,10 @@ async def confirm_rickroll(callback: CallbackQuery):
         )
         await callback.message.edit_text("😂 Rick Roll з QR-кодом відправлено! 🎣")
     except Exception as e:
-        await callback.message.edit_text(f"❌ Помилка: Переконайтеся, що файл qr_code.png лежить у папці з ботом.\n\nДеталі: {e}")
-    
+        await callback.message.edit_text(
+            f"❌ Помилка: переконайся що файл <code>qr_code.png</code> лежить у папці з ботом.\n\n{e}",
+            parse_mode="HTML"
+        )
     await callback.answer()
 
 
